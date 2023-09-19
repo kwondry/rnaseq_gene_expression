@@ -32,6 +32,7 @@ rule parse_kraken_make_nfcore_samplesheet:
         expand("results/kraken/{sample}.txt", sample = ALL_SAMPLES)
     output:
         samplesheet = "results/samples_filtered_for_nfcore.csv",
+        bad_samples = "results/badsamples_from_kraken.csv",
         kraken_stats = "results/percent_human_by_sample.csv"
     conda:
         "envs/tidyverse.yaml"

@@ -14,4 +14,10 @@ raw_sample_sheet %>%
     ) %>%
     write_csv(snakemake@output[["samplesheet"]])
 
+raw_sample_sheet %>%
+    anti_join(
+        all_kraken_results %>% filter(tax_name == "Homo sapiens", n_taxon >= snakemake@params[["min_human_reads"]])
+    ) %>%
+    write_csv(snakemake@output[["bad_samples"]])
+
 all_kraken_results %>% write_csv(snakemake@output[["kraken_stats"]])

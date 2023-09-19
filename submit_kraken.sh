@@ -5,7 +5,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --mem=16GB
 #SBATCH --partition=short
-#SBATCH --job-name=submit_jobs
+#SBATCH --job-name=submit_kraken
 
 mkdir -p ./slurm
 
