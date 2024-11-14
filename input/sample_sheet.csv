@@ -1,3 +1,3 @@
 sample,fastq_1,fastq_2,strandedness
-SIb1_12_D3_RNA_SKM,/n/groups/kwon/johnathan/projects/rnaseq_working/smartseq_kraken-main/input/raw/SIb1-12_S42_L001_R1_001.fastq.gz,,auto
-SIb1_13_G1_RNA_SKM,/n/groups/kwon/johnathan/projects/rnaseq_working/smartseq_kraken-main/input/raw/SIb1-13_S43_L001_R1_001.fastq.gz,,auto
+SIb1_12_D3_RNA_SKM,/n/groups/kwon/joseph/lab_pipelines/smartseq_kraken/input/raw/SIb1-12_S42_L001_R1_001.fastq.gz,,auto
+SIb1_13_G1_RNA_SKM,/n/groups/kwon/joseph/lab_pipelines/smartseq_kraken/input/raw/SIb1-13_S43_L001_R1_001.fastq.gz,,auto

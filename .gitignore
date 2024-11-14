@@ -1,0 +1,8 @@
+.nextflow.log*
+.nextflow/
+.snakemake/
+input/raw/
+results/
+temp/
+test.config
+test_results/
