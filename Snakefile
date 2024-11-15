@@ -2,7 +2,7 @@ import pandas as pd
 
 rule target:
     input:
-        done = "results/star_salmon/multiqc/nfcore_rnaseq_multiqc_report.html"
+        done = "results/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html"
 
 rule test:
     input:
