@@ -1,8 +1,54 @@
 import pandas as pd
+import logging
+import math
+
+# split sample sheet with >1000 samples into batches
+path_to_sample_sheet = "input/sample_sheet.csv"
+
+def split_sample_sheet(path, verbose=False):
+    # logging config
+    #logger = logging.getLogger() 
+    #if logger.hasHandlers():
+    #    logger.handlers.clear()
+    #if verbose:
+    #    logging.basicConfig(level=logging.DEBUG)
+    #else:
+    #    logging.basicConfig(level=logging.INFO)
+    
+    # check if sample sheet has been split already
+    if os.path.isdir("./input/sample_sheet_batches/"):
+        print("Sample sheet has already been separated into batches")
+    else:
+        # load sample sheet
+        sample_sheet = pd.read_csv(path)
+        # Calculate the number of batches and batch size
+        num_batches = math.ceil(sample_sheet.shape[0] / 1000)
+        batch_size = math.ceil(sample_sheet.shape[0] / num_batches)
+        # Sort by the 'sample' column
+        sample_sheet = sample_sheet.sort_values(by='sample')
+        # Create a row number (starting at 1 for consistency with R)
+        sample_sheet['row_number'] = range(1, len(sample_sheet) + 1)
+        # Calculate potentially_wrong_batch
+        sample_sheet['potentially_wrong_batch'] = 1 + (sample_sheet['row_number'] / batch_size).apply(math.floor)
+        # Group by sample and assign the 'batch' as the first potentially_wrong_batch for that sample
+        sample_sheet['batch'] = sample_sheet.groupby('sample')['potentially_wrong_batch'].transform('first')
+        # (Optional) If you don't need the intermediate columns anymore, you can drop them:
+        sample_sheet = sample_sheet.drop(columns=['row_number', 'potentially_wrong_batch'])        
+        # output CSV files for each batch
+        os.makedirs("./input/sample_sheet_batches/")
+        for batch_number, group_df in sample_sheet.groupby('batch'):
+            path_to_sample_sheet_batch = f"./input/sample_sheet_batches/sample_sheet_batch{batch_number}.csv"
+            group_df.drop("batch", axis=1).to_csv(path_to_sample_sheet_batch)
+        #logger.debug(sample_sheet.groupby('batch').size())
+
+
+split_sample_sheet(path_to_sample_sheet, verbose=False)
+
+ALL_BATCHES = glob_wildcards("input/sample_sheet_batches/sample_sheet_{batch_num}.csv").batch_num
 
 rule target:
     input:
-        done = "results/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html"
+        expand("results/{batch_num}/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html", batch_num=ALL_BATCHES)
 
 rule test:
     input:
@@ -10,11 +56,11 @@ rule test:
 
 rule rnaseq_pipeline:
     input:
-        input = "input/sample_sheet.csv",
+        input = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv",
         fasta = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
         gtf = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.110.chr.gtf.gz"
     output:
-        "results/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html"
+        "results/{batch_num}/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html"
     params:
         pipeline = "nf-core/rnaseq",
         revision = "3.12.0",
@@ -29,9 +75,11 @@ rule rnaseq_pipeline:
         skip_stringtie = True,
         skip_preseq = True,
         salmon_index = "/n/groups/kwon/data1/databases/rnaseq_index/index/salmon",
-        multiqc_title = "nfcore_rnaseq",
-        extra = "-c rnaseq.config -w temp/work -resume",
+        multiqc_title = "nfcore_rnaseq_{batch_num}",
+        extra = "-c rnaseq.config -w temp/work_{batch_num} -resume -log .nextflow.{batch_num}.log",
         outdir = lambda wildcards, output: str(Path(output[0]).parents[-2])
+    resources:
+        active_nextflow = 1   # only runs one batch at a time
     handover: True
     wrapper:
         "v5.0.0/utils/nextflow"

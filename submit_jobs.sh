@@ -9,4 +9,4 @@
 
 mkdir -p ./slurm
 
-snakemake  --executor slurm --default-resources slurm_partition=short --configfile config.yaml --use-conda --jobname {rulename}.{jobid} --jobs 500 --keep-going --rerun-incomplete
+snakemake  --executor slurm --default-resources slurm_partition=short --resources active_nextflow=1 --configfile config.yaml --use-conda --jobname {rulename}.{jobid} --jobs 500 --keep-going --rerun-incomplete
