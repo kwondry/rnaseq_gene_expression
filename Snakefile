@@ -42,17 +42,69 @@ def split_sample_sheet(path, verbose=False):
         #logger.debug(sample_sheet.groupby('batch').size())
 
 
+
+
 split_sample_sheet(path_to_sample_sheet, verbose=False)
 
 ALL_BATCHES = glob_wildcards("input/sample_sheet_batches/sample_sheet_{batch_num}.csv").batch_num
 
+
 rule target:
     input:
-        expand("results/{batch_num}/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html", batch_num=ALL_BATCHES)
+        # expand("results/{batch_num}/multiqc/star_salmon/nfcore_rnaseq_{batch_num}_multiqc_report.html", batch_num=ALL_BATCHES)
+        "results/combined_salmon.merged.gene_counts.tsv"
 
 rule test:
     input:
         test_done = "test_results/multiqc/star_salmon/nfcore_rnaseq_test_multiqc_report.html"
+
+def get_samples_for_batch(batch_num):
+    raw_sample_sheet = pd.read_csv(f"input/sample_sheet_batches/sample_sheet_{batch_num}.csv")
+    return raw_sample_sheet["sample"].tolist()
+
+def get_fastqs_for_kraken(wildcards):
+    raw_sample_sheet = pd.read_csv(f"input/sample_sheet.csv").to_dict(orient="records")
+    fastq_map = {rec["sample"]:{"forward_fastq":rec["fastq_1"], "reverse_fastq":rec["fastq_2"]} for rec in raw_sample_sheet}
+    return {"db":"/n/scratch/users/j/jos6417/kraken_db", "forward_fastq":fastq_map[wildcards.sample]["forward_fastq"]}
+
+
+rule kraken:
+    input:
+        unpack(get_fastqs_for_kraken)
+    output:
+        report = "results/{batch_num}/kraken/{sample}.txt"
+    conda:
+        "envs/kraken.yaml"
+    resources:
+        cpus_per_task=8, 
+        mem_mb=32000,
+        runtime="8h",
+        partition="short"
+    shell:
+        """
+        kraken2 --db {input.db} --gzip-compressed --threads {threads} \
+         {input.forward_fastq}  --memory-mapping --report {output.report}
+        """
+
+rule parse_kraken_make_nfcore_samplesheet:
+    input:
+        kraken_results = expand("results/{{batch_num}}/kraken/{sample}.txt", sample = lambda wildcards: get_samples_for_batch(wildcards.batch_num)),
+        raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
+    output:
+        samplesheet = "results/{batch_num}/samples_filtered_for_nfcore.csv",
+        kraken_stats = "results/{batch_num}/percent_human_by_sample.csv"
+    conda:
+        "envs/tidyverse.yaml"
+    params:
+        min_human_reads = 100000
+    resources:
+        cpus_per_task=4, 
+        mem_mb=16000,
+        runtime="8h",
+        partition="short"
+    script:
+        "scripts/parse_kraken_make_nfcore_samplesheet.R"
+
 
 rule rnaseq_pipeline:
     input:
@@ -60,7 +112,7 @@ rule rnaseq_pipeline:
         fasta = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
         gtf = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.110.chr.gtf.gz"
     output:
-        "results/{batch_num}/multiqc/star_salmon/nfcore_rnaseq_multiqc_report.html"
+        "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv"
     params:
         pipeline = "nf-core/rnaseq",
         revision = "3.12.0",
@@ -76,13 +128,35 @@ rule rnaseq_pipeline:
         skip_preseq = True,
         salmon_index = "/n/groups/kwon/data1/databases/rnaseq_index/index/salmon",
         multiqc_title = "nfcore_rnaseq_{batch_num}",
-        extra = "-c rnaseq.config -w temp/work_{batch_num} -resume -log .nextflow.{batch_num}.log",
-        outdir = lambda wildcards, output: str(Path(output[0]).parents[-2])
-    resources:
-        active_nextflow = 1   # only runs one batch at a time
+        extra = "-c rnaseq.config -w temp/work_{batch_num} -resume",
+        outdir = lambda wildcards, output: str(Path(output[0]).parents[-3])
+    # resources:
+    #     active_nextflow = 1   # only runs one batch at a time
     handover: True
     wrapper:
         "v5.0.0/utils/nextflow"
+
+
+rule combining_batches:
+    input:
+        gene_counts = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv", batch_num = ALL_BATCHES),
+        gene_tpm = expand("results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv", batch_num = ALL_BATCHES),
+        avg_transcript_lengths = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv", batch_num = ALL_BATCHES),
+        gene_counts_library_scaled = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_scaled.tsv", batch_num = ALL_BATCHES)
+    output:
+        combined_gene_counts = "results/combined_salmon.merged.gene_counts.tsv",
+        combined_gene_tpm = "results/combined_salmon.merged.gene_tpm.tsv",
+        combined_avg_transcript_lengths = "results/combined_salmon.merged.gene_counts_length_scaled.tsv",
+        combined_gene_counts_library_scaled = "results/combined_salmon.merged.gene_counts_scaled.tsv"
+    conda:
+        "envs/tidyverse.yaml"
+    resources:
+        cpus_per_task=2, 
+        mem_mb=64000,
+        runtime="8h",
+        partition="short"
+    script:
+        "scripts/combining_batches.R"
 
 rule rnaseq_pipeline_test:
     output:
@@ -106,5 +180,9 @@ rule rnaseq_pipeline_test:
     handover: True
     wrapper:
         "v5.0.0/utils/nextflow"
+
+
+
+
 
 
