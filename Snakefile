@@ -108,11 +108,16 @@ rule parse_kraken_make_nfcore_samplesheet:
 
 rule rnaseq_pipeline:
     input:
-        input = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv",
+        input = "results/{batch_num}/samples_filtered_for_nfcore.csv",
         fasta = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
         gtf = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.110.chr.gtf.gz"
+
     output:
-        "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv"
+        gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
+        gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
+        avg_transcript_lengths = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv",
+        gene_counts_library_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_scaled.tsv"
+
     params:
         pipeline = "nf-core/rnaseq",
         revision = "3.12.0",
