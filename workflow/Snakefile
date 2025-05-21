@@ -140,7 +140,7 @@ rule rnaseq_pipeline:
         temp_dir = temp(directory("temp/work_{batch_num}"))
     params:
         pipeline = "nf-core/rnaseq",
-        revision = "3.12.0",
+        revision = "3.15.0",
         profile = ["mamba"],
         aligner = "star_salmon",
         save_reference = False,
@@ -159,7 +159,7 @@ rule rnaseq_pipeline:
         active_nextflow = 1   # only runs two batches at a time
     handover: True
     wrapper:
-        "v5.0.0/utils/nextflow"
+        "v6.2.0/utils/nextflow"
 
 
 rule combining_batches:
@@ -186,7 +186,7 @@ rule rnaseq_pipeline_test:
         "test_results/multiqc/star_salmon/nfcore_rnaseq_test_multiqc_report.html",
     params:
         pipeline = "nf-core/rnaseq",
-        revision = "3.12.0",
+        revision = "3.15.0",
         profile = ["test", "mamba"],
         aligner = "star_salmon",
         save_reference = False,
@@ -202,4 +202,4 @@ rule rnaseq_pipeline_test:
         outdir = lambda wildcards, output: str(Path(output[0]).parents[-2])
     handover: True
     wrapper:
-        "v5.0.0/utils/nextflow"
+        "v6.2.0/utils/nextflow"
