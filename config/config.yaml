@@ -1,4 +1,4 @@
-sample_sheet_path: "input/test_samplesheet.csv"
+sample_sheet_path: "input/test_sample_sheet.csv"
 sample_sheet_batch_size: 1000
 kraken_db_path: "/n/scratch/users/j/je112/kraken_db"
 
