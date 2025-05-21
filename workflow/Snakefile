@@ -3,47 +3,41 @@ import os
 import logging
 import math
 
+configfile: "config/config.yaml"
+
+path_to_sample_sheet = config["sample_sheet_path"]
+
 # split sample sheet with >1000 samples into batches
-path_to_sample_sheet = "input/ben_samplesheet_smartseq_20250110.csv"
-
 def split_sample_sheet(path, verbose=False):
-    # logging config
-    #logger = logging.getLogger() 
-    #if logger.hasHandlers():
-    #    logger.handlers.clear()
-    #if verbose:
-    #    logging.basicConfig(level=logging.DEBUG)
-    #else:
-    #    logging.basicConfig(level=logging.INFO)
-    
-    # check if sample sheet has been split already
     if os.path.isdir("./input/sample_sheet_batches/"):
-        print("Sample sheet has already been separated into batches")
+        print("Sample sheet has already been separated into batches or processed as a single batch.")
     else:
-        # load sample sheet
         sample_sheet = pd.read_csv(path)
-        # Calculate the number of batches and batch size
-        num_batches = math.ceil(sample_sheet.shape[0] / 1000)
-        batch_size = math.ceil(sample_sheet.shape[0] / num_batches)
-        # Sort by the 'sample' column
-        sample_sheet = sample_sheet.sort_values(by='sample')
-        # Create a row number (starting at 1 for consistency with R)
-        sample_sheet['row_number'] = range(1, len(sample_sheet) + 1)
-        # Calculate potentially_wrong_batch
-        sample_sheet['potentially_wrong_batch'] = 1 + (sample_sheet['row_number'] / batch_size).apply(math.floor)
-        # Group by sample and assign the 'batch' as the first potentially_wrong_batch for that sample
-        sample_sheet['batch'] = sample_sheet.groupby('sample')['potentially_wrong_batch'].transform('first')
-        # (Optional) If you don't need the intermediate columns anymore, you can drop them:
-        sample_sheet = sample_sheet.drop(columns=['row_number', 'potentially_wrong_batch'])        
-        # output CSV files for each batch
-        os.makedirs("./input/sample_sheet_batches/")
-        for batch_number, group_df in sample_sheet.groupby('batch'):
-            path_to_sample_sheet_batch = f"./input/sample_sheet_batches/sample_sheet_batch{batch_number}.csv"
-            group_df.drop("batch", axis=1).to_csv(path_to_sample_sheet_batch)
-        #logger.debug(sample_sheet.groupby('batch').size())
+        batch_size_config = config["sample_sheet_batch_size"]# Default to 1000 if not in config
 
+        os.makedirs("./input/sample_sheet_batches/", exist_ok=True)
 
-
+        if sample_sheet.shape[0] > 2 * batch_size_config:
+            print(f"Number of samples ({sample_sheet.shape[0]}) exceeds 2 * batch size ({batch_size_config}). Splitting into batches.")
+            num_batches = math.ceil(sample_sheet.shape[0] / batch_size_config)
+            # Sort by the 'sample' column
+            sample_sheet = sample_sheet.sort_values(by='sample')
+            # Create a row number (starting at 1 for consistency with R)
+            sample_sheet['row_number'] = range(1, len(sample_sheet) + 1)
+            # Calculate potentially_wrong_batch
+            sample_sheet['potentially_wrong_batch'] = 1 + (sample_sheet['row_number'] / batch_size_config).apply(math.floor)
+            # Group by sample and assign the 'batch' as the first potentially_wrong_batch for that sample
+            sample_sheet['batch'] = sample_sheet.groupby('sample')['potentially_wrong_batch'].transform('first')
+            # (Optional) If you don't need the intermediate columns anymore, you can drop them:
+            sample_sheet = sample_sheet.drop(columns=['row_number', 'potentially_wrong_batch'])        
+            # output CSV files for each batch
+            for batch_number, group_df in sample_sheet.groupby('batch'):
+                path_to_sample_sheet_batch = f"./input/sample_sheet_batches/sample_sheet_batch{batch_number}.csv"
+                group_df.drop("batch", axis=1).to_csv(path_to_sample_sheet_batch, index=False)
+        else:
+            print(f"Number of samples ({sample_sheet.shape[0]}) is not greater than 2 * batch size ({batch_size_config}). Creating a single batch file.")
+            path_to_sample_sheet_batch = f"./input/sample_sheet_batches/sample_sheet_batch1.csv"
+            sample_sheet.to_csv(path_to_sample_sheet_batch, index=False)
 
 split_sample_sheet(path_to_sample_sheet, verbose=False)
 
@@ -65,25 +59,48 @@ def get_samples_for_batch(batch_num):
 def get_fastqs_for_kraken(wildcards):
     raw_sample_sheet = pd.read_csv(path_to_sample_sheet).to_dict(orient="records")
     fastq_map = {rec["sample"]:{"forward_fastq":rec["fastq_1"], "reverse_fastq":rec["fastq_2"]} for rec in raw_sample_sheet}
-    return {"db":"/n/scratch/users/j/jos6417/kraken_db", "forward_fastq":fastq_map[wildcards.sample]["forward_fastq"]}
+    return {"forward_fastq":fastq_map[wildcards.sample]["forward_fastq"]}
 
+rule download_kraken_db:
+    output:
+        db_file = f"{config['kraken_db_path']}/hash.k2d"
+    params:
+        db_path = config["kraken_db_path"],
+        db_url = "https://genome-idx.s3.amazonaws.com/kraken/k2_standard_20250402.tar.gz"
+    resources:
+        cpus_per_task=1, 
+        mem_mb=8000,
+        runtime="8h",
+        partition="short"
+    shell:
+        """
+        mkdir -p {params.db_path}
+        cd {params.db_path}
+        wget {params.db_url}
+        tar -xzf k2_standard_20250402.tar.gz
+        rm k2_standard_20250402.tar.gz
+        """
 
 rule kraken:
     input:
-        unpack(get_fastqs_for_kraken)
+        unpack(get_fastqs_for_kraken),
+        db_hash_file = f"{config['kraken_db_path']}/hash.k2d"
     output:
         report = "results/{batch_num}/kraken/{sample}.txt"
     conda:
         "envs/kraken.yaml"
     resources:
         cpus_per_task=8, 
-        mem_mb=32000,
-        runtime="8h",
+        mem_mb=110000,
+        runtime="4h",
         partition="short"
+    threads: 8
+    params:
+        kraken_db_path = config["kraken_db_path"]
     shell:
         """
-        kraken2 --db {input.db} --gzip-compressed --threads {threads} \
-         {input.forward_fastq}  --memory-mapping --report {output.report}
+        kraken2 --db {params.kraken_db_path} --gzip-compressed --threads {threads} \
+         {input.forward_fastq} --report {output.report}
         """
 
 def get_kraken_results(wildcards):
@@ -102,8 +119,8 @@ rule parse_kraken_make_nfcore_samplesheet:
     params:
         min_human_reads = 100000
     resources:
-        cpus_per_task=4,
-        mem_mb=16000,
+        cpus_per_task=1,
+        mem_mb=4000,
         runtime="8h",
         partition="short"
     script:
@@ -117,7 +134,8 @@ rule rnaseq_pipeline:
     output:
         gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
-        avg_transcript_lengths = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv"
+        counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv",
+        temp_dir = temp(directory("temp/work_{batch_num}"))
     params:
         pipeline = "nf-core/rnaseq",
         revision = "3.12.0",
@@ -133,10 +151,10 @@ rule rnaseq_pipeline:
         skip_preseq = True,
         salmon_index = "/n/groups/kwon/data1/databases/rnaseq_index/index/salmon",
         multiqc_title = "nfcore_rnaseq_{batch_num}",
-        extra = "-c rnaseq.config -w temp/work_{batch_num} -resume",
+        extra = "-c workflow/rnaseq.config -w temp/work_{batch_num} -resume",
         outdir = lambda wildcards, output: output.gene_counts.split("/star_salmon/")[0] + "/"
-    # resources:
-    #     active_nextflow = 1   # only runs one batch at a time
+    resources:
+        active_nextflow = 1   # only runs two batches at a time
     handover: True
     wrapper:
         "v5.0.0/utils/nextflow"
@@ -146,11 +164,11 @@ rule combining_batches:
     input:
         gene_counts = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv", batch_num = ALL_BATCHES),
         gene_tpm = expand("results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv", batch_num = ALL_BATCHES),
-        avg_transcript_lengths = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv", batch_num = ALL_BATCHES),
+        counts_length_scaled = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv", batch_num = ALL_BATCHES)
     output:
         combined_gene_counts = "results/combined_salmon.merged.gene_counts.tsv",
         combined_gene_tpm = "results/combined_salmon.merged.gene_tpm.tsv",
-        combined_avg_transcript_lengths = "results/combined_salmon.merged.gene_counts_length_scaled.tsv"
+        combined_counts_length_scaled = "results/combined_salmon.merged.gene_counts_length_scaled.tsv"
     conda:
         "envs/tidyverse.yaml"
     resources:

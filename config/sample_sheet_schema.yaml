@@ -1,0 +1,18 @@
+properties:
+  sample:
+    type: string
+    description: "Unique identifier for the sample."
+  fastq_1:
+    type: string
+    description: "Path to the forward FASTQ file (R1)."
+  fastq_2:
+    type: string
+    description: "Path to the reverse FASTQ file (R2). Leave empty for single-end data, but column must exist."
+  strandedness:
+    type: string
+    description: "Strandedness of the RNA-seq data. Options are 'forward', 'reverse', or 'unstranded'."
+required:
+  - sample
+  - fastq_1
+  - fastq_2
+  - strandedness
