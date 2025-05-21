@@ -4,14 +4,14 @@ import logging
 import math
 from snakemake.utils import validate
 
-configfile: "../config/config.yaml"
+configfile: "config/config.yaml"
 
 path_to_sample_sheet = config["sample_sheet_path"]
 
 validate(pd.read_csv(path_to_sample_sheet), "../config/sample_sheet_schema.yaml")
 
 # split sample sheet with >1000 samples into batches
-def split_sample_sheet(path, verbose=False):
+def split_sample_sheet(path):
     if os.path.isdir("./input/sample_sheet_batches/"):
         print("Sample sheet has already been separated into batches or processed as a single batch.")
     else:
@@ -42,7 +42,7 @@ def split_sample_sheet(path, verbose=False):
             path_to_sample_sheet_batch = f"./input/sample_sheet_batches/sample_sheet_batch1.csv"
             sample_sheet.to_csv(path_to_sample_sheet_batch, index=False)
 
-split_sample_sheet(path_to_sample_sheet, verbose=False)
+split_sample_sheet(path_to_sample_sheet)
 
 ALL_BATCHES = glob_wildcards("input/sample_sheet_batches/sample_sheet_{batch_num}.csv").batch_num
 
