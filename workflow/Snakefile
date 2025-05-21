@@ -4,7 +4,7 @@ import logging
 import math
 from snakemake.utils import validate
 
-configfile: "config/config.yaml"
+configfile: "../config/config.yaml"
 
 path_to_sample_sheet = config["sample_sheet_path"]
 
