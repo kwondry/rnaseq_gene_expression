@@ -107,7 +107,6 @@ rule kraken:
         """
 
 def get_kraken_results(wildcards):
-    print(["results/{{batch_num}}/kraken/{}.txt".format(s) for s in get_samples_for_batch(wildcards.batch_num)])
     return ["results/{{batch_num}}/kraken/{}.txt".format(s) for s in get_samples_for_batch(wildcards.batch_num)]
 
 rule parse_kraken_make_nfcore_samplesheet:
