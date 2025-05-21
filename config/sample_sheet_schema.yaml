@@ -1,3 +1,6 @@
+$schema: "http://json-schema.org/draft-07/schema#"
+description: Schema for genome list CSV file
+type: object
 properties:
   sample:
     type: string
