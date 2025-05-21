@@ -73,11 +73,13 @@ required:
 **Example `samples.csv`:**
 
 ```csv
-sample,fastq_1,fastq_2
-SampleA,/path/to/SampleA_R1.fastq.gz,/path/to/SampleA_R2.fastq.gz
-SampleB,/path/to/SampleB_R1.fastq.gz,/path/to/SampleB_R2.fastq.gz
-SampleC,/path/to/SampleC_R1.fastq.gz,
+sample,fastq_1,fastq_2,strandedness
+SampleA,/path/to/SampleA_R1.fastq.gz,/path/to/SampleA_R2.fastq.gz,unstranded
+SampleB,/path/to/SampleB_R1.fastq.gz,/path/to/SampleB_R2.fastq.gz,unstranded
+SampleC,/path/to/SampleC_R1.fastq.gz,,unstranded
 ```
+
+For the `strandedness` column, refer to the details of your library prep. Are reads in the `forward` orientation relative to the gene, or `reverse`? Or could they be either (`unstranded`)? If you are unsure you can set to `auto`, but this will fail for very contanminated, low quality libraries and results in extra execution time.  
 
 ## Usage
 
