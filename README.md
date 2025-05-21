@@ -8,6 +8,14 @@ The main steps are:
 3. runs the `nfcore rnaseq` pipeline on each batch
 4. combines the outputs of each batch into one output file
 
+## Preflight checks
+
+make sure you have conda and mamba, and snakemake > version 9.
+
+We've tested this pipeline with mamba v2.1.1, Snakemake 9.3.3, Version 6.2 of the nextflow wrapper, and the 3.15 version of the nfcore pipeline. You should only need to change or care about the mamba and Snakemake version. 
+
+
+
 ## Workflow Structure
 
 The project aims to follow the recommended Snakemake workflow structure. The current structure is:
