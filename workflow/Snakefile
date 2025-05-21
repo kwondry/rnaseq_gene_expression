@@ -7,6 +7,8 @@ configfile: "config/config.yaml"
 
 path_to_sample_sheet = config["sample_sheet_path"]
 
+validate(pd.read_csv(path_to_sample_sheet), "../config/sample_sheet.schema.yaml")
+
 # split sample sheet with >1000 samples into batches
 def split_sample_sheet(path, verbose=False):
     if os.path.isdir("./input/sample_sheet_batches/"):
