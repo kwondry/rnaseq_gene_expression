@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import logging
 import math
+from snakemake.utils import validate
 
 configfile: "config/config.yaml"
 
