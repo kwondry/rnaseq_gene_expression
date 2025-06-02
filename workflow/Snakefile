@@ -94,8 +94,8 @@ rule kraken:
         "envs/kraken.yaml"
     resources:
         cpus_per_task=8, 
-        mem_mb=110000,
-        runtime="4h",
+        mem_mb=100000,
+        runtime="2h",
         partition="short"
     threads: 8
     params:
@@ -138,6 +138,7 @@ rule rnaseq_pipeline:
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
         counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv",
         temp_dir = temp(directory("temp/work_{batch_num}"))
+    retries: 4
     params:
         pipeline = "nf-core/rnaseq",
         revision = "3.15.0",
