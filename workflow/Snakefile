@@ -136,8 +136,8 @@ rule rnaseq_pipeline:
     output:
         gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
-        counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv",
-        temp_dir = temp(directory("temp/work_{batch_num}"))
+        counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv"
+    onsuccess: shell("rm -rf temp/work_{batch_num}")    
     retries: 4
     params:
         pipeline = "nf-core/rnaseq",
