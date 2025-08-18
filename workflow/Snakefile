@@ -137,14 +137,14 @@ rule rnaseq_pipeline:
         gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
         counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv"
-    onsuccess: shell("rm -rf temp/work_{batch_num}")    
     retries: 4
     params:
         pipeline = "nf-core/rnaseq",
-        revision = "3.15.0",
+        revision = "3.20.0",
         profile = ["mamba"],
         aligner = "star_salmon",
         save_reference = False,
+        genome ="GRCh38",
         min_trimmed_reads = 100000,
         save_align_intermeds = False,
         skip_deseq2_qc = True,
@@ -160,14 +160,34 @@ rule rnaseq_pipeline:
         active_nextflow = 1   # only runs two batches at a time
     handover: True
     wrapper:
-        "v6.2.0/utils/nextflow"
+        "v7.2.0/utils/nextflow"
 
+
+localrules: cleanup_nextflow_work
+
+rule cleanup_nextflow_work:
+    input:
+        gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv"
+    output:
+        touch("results/{batch_num}/.cleanup_done")
+    params:
+        work_dir = "temp/work_{batch_num}"
+    shell:
+        """
+        if [ -d "{params.work_dir}" ]; then
+            rm -rf {params.work_dir}
+            echo "Cleaned up {params.work_dir}"
+        else
+            echo "Directory {params.work_dir} does not exist, skipping cleanup"
+        fi
+        """
 
 rule combining_batches:
     input:
         gene_counts = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv", batch_num = ALL_BATCHES),
         gene_tpm = expand("results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv", batch_num = ALL_BATCHES),
-        counts_length_scaled = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv", batch_num = ALL_BATCHES)
+        counts_length_scaled = expand("results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv", batch_num = ALL_BATCHES),
+        cleanup_flags = expand("results/{batch_num}/.cleanup_done", batch_num = ALL_BATCHES)
     output:
         combined_gene_counts = "results/combined_salmon.merged.gene_counts.tsv",
         combined_gene_tpm = "results/combined_salmon.merged.gene_tpm.tsv",
@@ -187,7 +207,7 @@ rule rnaseq_pipeline_test:
         "test_results/multiqc/star_salmon/nfcore_rnaseq_test_multiqc_report.html",
     params:
         pipeline = "nf-core/rnaseq",
-        revision = "3.15.0",
+        revision = "3.20.0",
         profile = ["test", "mamba"],
         aligner = "star_salmon",
         save_reference = False,
@@ -203,4 +223,4 @@ rule rnaseq_pipeline_test:
         outdir = lambda wildcards, output: str(Path(output[0]).parents[-2])
     handover: True
     wrapper:
-        "v6.2.0/utils/nextflow"
+        "v7.2.0/utils/nextflow"
