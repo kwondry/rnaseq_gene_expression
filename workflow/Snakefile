@@ -95,8 +95,9 @@ rule kraken:
     resources:
         cpus_per_task=8, 
         mem_mb=100000,
-        runtime="2h",
-        partition="short"
+        runtime="1h",
+        partition="short",
+        serial_slots=1
     threads: 8
     params:
         kraken_db_path = config["kraken_db_path"]
@@ -157,7 +158,11 @@ rule rnaseq_pipeline:
         extra = "-c workflow/rnaseq.config -w temp/work_{batch_num} -resume",
         outdir = lambda wildcards, output: output.gene_counts.split("/star_salmon/")[0] + "/"
     resources:
-        active_nextflow = 1   # only runs two batches at a time
+        active_nextflow = 1,   # only runs two batches at a time
+        cpus_per_task = 20,
+        mem_mb = 200000,
+        runtime = "72h",
+        partition = "priority"
     handover: True
     wrapper:
         "v7.2.0/utils/nextflow"
