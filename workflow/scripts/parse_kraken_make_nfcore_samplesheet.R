@@ -9,7 +9,7 @@ raw_sample_sheet <- read_csv(snakemake@input[["raw_sample_sheet"]])
 
 raw_sample_sheet %>%
     semi_join(
-        all_kraken_results %>% filter(tax_name == "Homo sapiens", n_taxon >= snakemake@params[["min_human_reads"]])
+        all_kraken_results %>% filter(tax_name == snakemake@params[["target_species"]], n_taxon >= snakemake@params[["min_target_reads"]])
     ) %>%
     mutate_all(~ifelse(is.na(.), "", .)) %>%
     write_csv(snakemake@output[["samplesheet"]])

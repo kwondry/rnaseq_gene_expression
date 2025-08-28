@@ -84,6 +84,45 @@ rule download_kraken_db:
         rm k2_standard_20250402.tar.gz
         """
 
+# Helper function to get genome info based on species
+def get_genome_info(species):
+    if species == "Homo sapiens":
+        return "homo_sapiens", "GRCh38"
+    elif species == "Mus musculus":
+        return "mus_musculus", "GRCm39"
+    else:
+        raise ValueError(f"Unsupported species: {species}")
+
+# Get genome info for configured species
+species_dir, genome_id = get_genome_info(config.get("target_species", "Homo sapiens"))
+ensembl_version = config.get("ensembl_version", 114)
+
+rule download_reference:
+    output:
+        fasta = f"resources/reference/{species_dir}.{genome_id}.ensembl_{ensembl_version}.dna_sm.primary_assembly.fa.gz",
+        gtf = f"resources/reference/{species_dir}.{genome_id}.ensembl_{ensembl_version}.gtf.gz"
+    params:
+        species = config.get("target_species", "Homo sapiens"),
+        version = ensembl_version,
+        species_dir = species_dir,
+        genome_id = genome_id
+    shell:
+        """
+        mkdir -p resources/reference
+        
+        # Set variables for capitalized names in URLs
+        SPECIES_DIR={params.species_dir}
+        GENOME_ID={params.genome_id}
+        
+        # Download fasta
+        wget -L -O {output.fasta} \
+            ftp://ftp.ensembl.org/pub/release-{params.version}/fasta/{params.species_dir}/dna/${{SPECIES_DIR^}}.${{GENOME_ID}}.dna_sm.primary_assembly.fa.gz
+        
+        # Download GTF  
+        wget -L -O {output.gtf} \
+            ftp://ftp.ensembl.org/pub/release-{params.version}/gtf/{params.species_dir}/${{SPECIES_DIR^}}.${{GENOME_ID}}.{params.version}.gtf.gz
+        """
+
 rule kraken:
     input:
         unpack(get_fastqs_for_kraken),
@@ -101,10 +140,12 @@ rule kraken:
     threads: 8
     params:
         kraken_db_path = config["kraken_db_path"]
+    log:
+        "logs/{batch_num}/kraken/{sample}.log"
     shell:
         """
-        kraken2 --db {params.kraken_db_path} --gzip-compressed --threads {threads} \
-         {input.forward_fastq} --report {output.report}
+        kraken2 --db {params.kraken_db_path} --gzip-compressed --threads {threads} \\
+         {input.forward_fastq} --report {output.report} > /dev/null 2> {log}
         """
 
 def get_kraken_results(wildcards):
@@ -116,11 +157,12 @@ rule parse_kraken_make_nfcore_samplesheet:
         raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
     output:
         samplesheet = "results/{batch_num}/samples_filtered_for_nfcore.csv",
-        kraken_stats = "results/{batch_num}/percent_human_by_sample.csv"
+        kraken_stats = "results/{batch_num}/percent_target_by_sample.csv"
     conda:
         "envs/tidyverse.yaml"
     params:
-        min_human_reads = 100000
+        min_target_reads = config.get("min_target_reads", 100000),
+        target_species = config.get("target_species", "Homo sapiens")
     resources:
         cpus_per_task=1,
         mem_mb=4000,
@@ -132,8 +174,8 @@ rule parse_kraken_make_nfcore_samplesheet:
 rule rnaseq_pipeline:
     input:
         input = "results/{batch_num}/samples_filtered_for_nfcore.csv",
-        fasta = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz",
-        gtf = "/n/groups/kwon/data1/databases/human/ensembl_110_grch38/Homo_sapiens.GRCh38.110.chr.gtf.gz"
+        fasta = f"resources/reference/{species_dir}.{genome_id}.ensembl_{ensembl_version}.dna_sm.primary_assembly.fa.gz",
+        gtf = f"resources/reference/{species_dir}.{genome_id}.ensembl_{ensembl_version}.gtf.gz"
     output:
         gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
@@ -145,7 +187,8 @@ rule rnaseq_pipeline:
         profile = ["mamba"],
         aligner = "star_salmon",
         save_reference = False,
-        genome ="GRCh38",
+        fasta = lambda wildcards, input: input.fasta,
+        gtf = lambda wildcards, input: input.gtf,
         min_trimmed_reads = 100000,
         save_align_intermeds = False,
         skip_deseq2_qc = True,
