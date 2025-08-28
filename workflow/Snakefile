@@ -106,6 +106,7 @@ rule download_reference:
         version = ensembl_version,
         species_dir = species_dir,
         genome_id = genome_id
+    localrule: True
     shell:
         """
         mkdir -p resources/reference
@@ -123,53 +124,74 @@ rule download_reference:
             ftp://ftp.ensembl.org/pub/release-{params.version}/gtf/{params.species_dir}/${{SPECIES_DIR^}}.${{GENOME_ID}}.{params.version}.gtf.gz
         """
 
-rule kraken:
-    input:
-        unpack(get_fastqs_for_kraken),
-        db_hash_file = f"{config['kraken_db_path']}/hash.k2d"
-    output:
-        report = "results/{batch_num}/kraken/{sample}.txt"
-    conda:
-        "envs/kraken.yaml"
-    resources:
-        cpus_per_task=8, 
-        mem_mb=100000,
-        runtime="1h",
-        partition="short",
-        serial_slots=1
-    threads: 8
-    params:
-        kraken_db_path = config["kraken_db_path"]
-    log:
-        "logs/{batch_num}/kraken/{sample}.log"
-    shell:
-        """
-        kraken2 --db {params.kraken_db_path} --gzip-compressed --threads {threads} \\
-         {input.forward_fastq} --report {output.report} > /dev/null 2> {log}
-        """
+# Only define kraken rule for human samples
+if config.get("target_species", "Homo sapiens") == "Homo sapiens":
+    rule kraken:
+        input:
+            unpack(get_fastqs_for_kraken),
+            db_hash_file = f"{config['kraken_db_path']}/hash.k2d"
+        output:
+            report = "results/{batch_num}/kraken/{sample}.txt"
+        conda:
+            "envs/kraken.yaml"
+        resources:
+            cpus_per_task=8, 
+            mem_mb=100000,
+            runtime="1h",
+            partition="short",
+            serial_slots=1
+        threads: 8
+        params:
+            kraken_db_path = config["kraken_db_path"]
+        log:
+            "logs/{batch_num}/kraken/{sample}.log"
+        shell:
+            """
+            kraken2 --db {params.kraken_db_path} --gzip-compressed --threads {threads} \\
+             {input.forward_fastq} --report {output.report} > /dev/null 2> {log}
+            """
 
-def get_kraken_results(wildcards):
-    return ["results/{{batch_num}}/kraken/{}.txt".format(s) for s in get_samples_for_batch(wildcards.batch_num)]
+    def get_kraken_results(wildcards):
+        return ["results/{{batch_num}}/kraken/{}.txt".format(s) for s in get_samples_for_batch(wildcards.batch_num)]
 
-rule parse_kraken_make_nfcore_samplesheet:
-    input:
-        kraken_results = get_kraken_results,
-        raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
-    output:
-        samplesheet = "results/{batch_num}/samples_filtered_for_nfcore.csv",
-        kraken_stats = "results/{batch_num}/percent_target_by_sample.csv"
-    conda:
-        "envs/tidyverse.yaml"
-    params:
-        min_target_reads = config.get("min_target_reads", 100000),
-        target_species = config.get("target_species", "Homo sapiens")
-    resources:
-        cpus_per_task=1,
-        mem_mb=4000,
-        runtime="8h",
-        partition="short"
-    script:
-        "scripts/parse_kraken_make_nfcore_samplesheet.R"
+# Conditional rule selection based on target species
+if config.get("target_species", "Homo sapiens") == "Homo sapiens":
+    # For human samples: run Kraken filtering
+    rule parse_kraken_make_nfcore_samplesheet:
+        input:
+            kraken_results = get_kraken_results,
+            raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
+        output:
+            samplesheet = "results/{batch_num}/samples_filtered_for_nfcore.csv",
+            kraken_stats = "results/{batch_num}/percent_target_by_sample.csv"
+        conda:
+            "envs/tidyverse.yaml"
+        params:
+            min_target_reads = config.get("min_target_reads", 100000),
+            target_species = config.get("target_species", "Homo sapiens")
+        resources:
+            cpus_per_task=1,
+            mem_mb=4000,
+            runtime="8h",
+            partition="short"
+        script:
+            "scripts/parse_kraken_make_nfcore_samplesheet.R"
+else:
+    # For mouse samples: skip Kraken, just copy the samplesheet
+    rule copy_samplesheet_for_nfcore:
+        input:
+            raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
+        output:
+            samplesheet = "results/{batch_num}/samples_filtered_for_nfcore.csv",
+            kraken_stats = "results/{batch_num}/percent_target_by_sample.csv"
+        localrule: True
+        shell:
+            """
+            cp {input.raw_sample_sheet} {output.samplesheet}
+            # Create empty kraken_stats file for consistency
+            echo "sample,pct,n_clade,n_taxon,tax_level,tax_id,tax_name,report_path" > {output.kraken_stats}
+            """
+
 
 rule rnaseq_pipeline:
     input:
@@ -183,7 +205,7 @@ rule rnaseq_pipeline:
     retries: 4
     params:
         pipeline = "nf-core/rnaseq",
-        revision = "3.20.0",
+        revision = "3.15.0",
         profile = ["mamba"],
         aligner = "star_salmon",
         save_reference = False,

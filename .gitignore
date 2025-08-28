@@ -6,3 +6,7 @@ results/
 temp/
 test.config
 test_results/
+slurm-*
+logs/
+resources/
+input/sample_sheet_batches
