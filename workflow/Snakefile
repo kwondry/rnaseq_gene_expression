@@ -220,7 +220,7 @@ rule rnaseq_pipeline:
         skip_preseq = True,
         salmon_index = "/n/groups/kwon/data1/databases/rnaseq_index/index/salmon",
         multiqc_title = "nfcore_rnaseq_{batch_num}",
-        extra = "-c workflow/rnaseq.config -w temp/work_{batch_num}",
+        extra = "-c workflow/rnaseq.config -w temp/work_{batch_num} -resume",
         outdir = lambda wildcards, output: output.gene_counts.split("/star_salmon/")[0] + "/"
     resources:
         active_nextflow = 1,   # only runs two batches at a time
