@@ -1,7 +1,8 @@
-sample_sheet_path: "input/jing_maryam_samplesheet_20250828.csv"
+sample_sheet_path: "/n/scratch/groups/mgh/kwon/simran_rnaseq_20251211/simran_samples.csv"
 sample_sheet_batch_size: 1000
 kraken_db_path: "/n/scratch/users/j/je112/kraken_db"
+skip_kraken: "true"
 min_target_reads: 100000
-target_species: "Mus musculus"
-ensembl_version: 114
+target_species: "Homo sapiens"
+ensembl_version: 115
 

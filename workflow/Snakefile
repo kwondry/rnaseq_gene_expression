@@ -125,7 +125,7 @@ rule download_reference:
         """
 
 # Only define kraken rule for human samples
-if config.get("target_species", "Homo sapiens") == "Homo sapiens":
+if config.get("target_species", "Homo sapiens") == "Homo sapiens" and config.get("skip_kraken") == "false":
     rule kraken:
         input:
             unpack(get_fastqs_for_kraken),
@@ -155,7 +155,7 @@ if config.get("target_species", "Homo sapiens") == "Homo sapiens":
         return ["results/{{batch_num}}/kraken/{}.txt".format(s) for s in get_samples_for_batch(wildcards.batch_num)]
 
 # Conditional rule selection based on target species
-if config.get("target_species", "Homo sapiens") == "Homo sapiens":
+if config.get("target_species", "Homo sapiens") == "Homo sapiens" and config.get("skip_kraken") == "false":
     # For human samples: run Kraken filtering
     rule parse_kraken_make_nfcore_samplesheet:
         input:
@@ -177,7 +177,7 @@ if config.get("target_species", "Homo sapiens") == "Homo sapiens":
         script:
             "scripts/parse_kraken_make_nfcore_samplesheet.R"
 else:
-    # For mouse samples: skip Kraken, just copy the samplesheet
+    # For mouse samples or if marked in config: skip Kraken, just copy the samplesheet
     rule copy_samplesheet_for_nfcore:
         input:
             raw_sample_sheet = "input/sample_sheet_batches/sample_sheet_{batch_num}.csv"
