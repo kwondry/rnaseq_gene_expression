@@ -1,4 +1,4 @@
-sample_sheet_path: "/n/scratch/groups/mgh/kwon/simran_rnaseq_20251211/simran_samples.csv"
+sample_sheet_path: "/n/groups/kwon/mzhu/pipelines/my_rnaseq_run/rnaseq_gene_expression-main/input/sample_sheet.csv"
 sample_sheet_batch_size: 1000
 kraken_db_path: "/n/scratch/users/j/je112/kraken_db"
 skip_kraken: "true"

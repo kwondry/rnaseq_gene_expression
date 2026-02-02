@@ -202,35 +202,43 @@ rule rnaseq_pipeline:
         gene_counts = "results/{batch_num}/star_salmon/salmon.merged.gene_counts.tsv",
         gene_tpm = "results/{batch_num}/star_salmon/salmon.merged.gene_tpm.tsv",
         counts_length_scaled = "results/{batch_num}/star_salmon/salmon.merged.gene_counts_length_scaled.tsv"
-    retries: 4
+    log:
+        "logs/rnaseq_pipeline/{batch_num}.log"
+    retries: 0
     params:
-        pipeline = "nf-core/rnaseq",
-        revision = "3.15.0",
-        profile = ["mamba"],
-        aligner = "star_salmon",
-        save_reference = False,
-        fasta = lambda wildcards, input: input.fasta,
-        gtf = lambda wildcards, input: input.gtf,
-        min_trimmed_reads = 100000,
-        save_align_intermeds = False,
-        skip_deseq2_qc = True,
-        skip_rseqc = True,
-        skip_bigwig = True,
-        skip_stringtie = True,
-        skip_preseq = True,
-        salmon_index = "/n/groups/kwon/data1/databases/rnaseq_index/index/salmon",
-        multiqc_title = "nfcore_rnaseq_{batch_num}",
-        extra = "-c workflow/rnaseq.config -w temp/work_{batch_num} -resume",
         outdir = lambda wildcards, output: output.gene_counts.split("/star_salmon/")[0] + "/"
     resources:
-        active_nextflow = 1,   # only runs two batches at a time
+        active_nextflow = 1,
         cpus_per_task = 20,
         mem_mb = 200000,
         runtime = "72h",
         partition = "priority"
     handover: True
-    wrapper:
-        "v7.2.0/utils/nextflow"
+    conda:
+        "envs/nextflow.yaml"
+    shell:
+        """
+        nextflow run nf-core/rnaseq \
+            -revision 3.20.0 \
+            -profile cluster,singularity \
+            -c workflow/rnaseq.config \
+            -w temp/work_{wildcards.batch_num} \
+            -resume \
+            --input {input.input} \
+            --fasta {input.fasta} \
+            --gtf {input.gtf} \
+            --aligner star_salmon \
+            --min_trimmed_reads 100000 \
+            --skip_deseq2_qc \
+            --skip_rseqc \
+            --skip_bigwig \
+            --skip_stringtie \
+            --skip_preseq \
+            --salmon_index /n/groups/kwon/data1/databases/rnaseq_index/index/salmon \
+            --multiqc_title nfcore_rnaseq_{wildcards.batch_num} \
+            --outdir {params.outdir} \
+            2> {log}
+        """
 
 
 localrules: cleanup_nextflow_work
