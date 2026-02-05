@@ -234,7 +234,6 @@ rule rnaseq_pipeline:
             --skip_bigwig \
             --skip_stringtie \
             --skip_preseq \
-            --salmon_index /n/groups/kwon/data1/databases/rnaseq_index/index/salmon \
             --multiqc_title nfcore_rnaseq_{wildcards.batch_num} \
             --outdir {params.outdir} \
             2> {log}
